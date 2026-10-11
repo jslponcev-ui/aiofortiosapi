@@ -70,10 +70,20 @@ client = FortiOSClient(..., device_online_threshold=600)
 
 ## Scope
 
+### Master-MAC clients
+
+`await client.get_master_mac_devices()` uses the legacy Home Assistant
+`format=master_mac|hostname|is_online` monitor query and returns typed
+`MasterMacDevice` objects. Their `mac` field comes only from `master_mac` and is
+uppercased; it is never replaced with the separate `mac` field. Missing online
+flags mean offline, without the `DetectedDevice` freshness fallback. Invalid
+response lists raise `FortiOSResponseError`, while an actual empty list returns
+an empty scan. The caller continues to own the HTTP session.
+
 `aiofortiosapi` is intentionally minimal:
 
-- **Three typed monitor endpoints** (`get_system_status`, `get_resource_usage`,
-  `get_detected_devices`) used by the Home Assistant integration.
+- **Typed monitor methods** (`get_system_status`, `get_resource_usage`,
+  `get_detected_devices`, `get_master_mac_devices`) for Home Assistant integrations.
 - A generic `get(path)` for any other endpoint that returns the raw JSON envelope.
 - **No** config-write, CMDB, file upload, SSH fallback, or CLI helpers.
 - **No** session/cookie login flow — Bearer token only.

@@ -9,7 +9,7 @@ from .exceptions import (
     FortiOSNotFoundError,
     FortiOSResponseError,
 )
-from .models import DetectedDevice, ResourceUsage, SystemStatus
+from .models import DetectedDevice, MasterMacDevice, ResourceUsage, SystemStatus
 
 __version__ = "0.1.0"
 
@@ -25,6 +25,7 @@ __all__ = [
     "SystemStatus",
     "ResourceUsage",
     "DetectedDevice",
+    "MasterMacDevice",
     # constants
     "DEFAULT_ONLINE_THRESHOLD",
     "__version__",

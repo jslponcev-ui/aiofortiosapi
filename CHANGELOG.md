@@ -6,6 +6,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- `get_master_mac_devices()` returns typed `MasterMacDevice` clients using the
+  legacy `format=master_mac|hostname|is_online` query. It preserves master-MAC
+  identity, uppercases MAC addresses, and treats missing online flags as offline.
+  Malformed lists raise `FortiOSResponseError` instead of returning an empty scan.
+
+### Fixed
+- `get_system_status()` and the new master-MAC method reject invalid/error
+  envelopes and map embedded HTTP 401/403 failures to authentication errors.
+
 ## [0.1.0] - 2026-08-26
 
 ### Added

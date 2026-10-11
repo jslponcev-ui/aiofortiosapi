@@ -24,7 +24,7 @@ from .exceptions import (
     FortiOSNotFoundError,
     FortiOSResponseError,
 )
-from .models import DetectedDevice, ResourceUsage, SystemStatus
+from .models import DetectedDevice, MasterMacDevice, ResourceUsage, SystemStatus
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,15 @@ _ERROR_DETAIL_KEYS: tuple[str, ...] = (
     "http_message",
 )
 _ERROR_DETAIL_MAX_CHARS = 200
+
+
+def _validate_response(raw: Any) -> dict[str, Any]:
+    """Reject failed envelopes even when the HTTP response succeeds."""
+    if isinstance(raw, dict) and raw.get("http_status") in (401, 403):
+        raise FortiOSAuthenticationError("FortiOS authentication failed")
+    if not isinstance(raw, dict) or raw.get("status") == "error":
+        raise FortiOSResponseError("Invalid FortiOS response")
+    return raw
 
 
 def _extract_error_detail(body_text: str) -> str:
@@ -168,7 +177,7 @@ class FortiOSClient:
 
     async def get_system_status(self) -> SystemStatus:
         """Return basic device identity: hostname, version, serial, model."""
-        raw = await self._request("GET", EP_SYSTEM_STATUS)
+        raw = _validate_response(await self._request("GET", EP_SYSTEM_STATUS))
         return SystemStatus.from_api(raw)
 
     async def get_resource_usage(self) -> ResourceUsage:
@@ -189,6 +198,22 @@ class FortiOSClient:
             now=time.time(),
             online_threshold=self._device_online_threshold,
         )
+
+    async def get_master_mac_devices(self) -> list[MasterMacDevice]:
+        """Read master-MAC clients using the legacy Home Assistant query.
+
+        Preserve ``master_mac`` identity and the API's online flag. Missing
+        flags mean offline, without the detected-device freshness fallback.
+        Malformed lists raise instead of appearing as a successful empty scan.
+        """
+        raw = _validate_response(
+            await self._request(
+                "GET",
+                EP_DETECTED_DEVICES,
+                params={"filter": "format=master_mac|hostname|is_online"},
+            )
+        )
+        return MasterMacDevice.list_from_api(raw)
 
     async def async_validate(self) -> SystemStatus:
         """Validate credentials cheaply by calling get_system_status.

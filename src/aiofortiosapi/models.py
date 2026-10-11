@@ -4,9 +4,9 @@ FortiOS wraps all payloads as:
   {"results": <dict|list>, "status": "success", "version": "v7.6.1",
    "serial": "FGT60F...", "vdom": "root", ...}
 
-Each model's from_api() accepts the full envelope dict and parses defensively:
-missing keys, null values, and unexpected shapes all fall back to safe
-defaults instead of raising.
+Most models accept the full envelope dict and parse defensively: missing keys,
+null values, and unexpected shapes fall back to safe defaults. MasterMacDevice
+validates client lists strictly so malformed responses do not look like empty scans.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .const import DEFAULT_ONLINE_THRESHOLD
+from .exceptions import FortiOSResponseError
 
 
 def _first(lst: Any, key: str, default: Any = None) -> Any:
@@ -108,6 +109,38 @@ class ResourceUsage:
                 + _to_int(_first(results.get("setuprate6"), "current"))
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class MasterMacDevice:
+    """A client identified by the master MAC from the filtered monitor query."""
+
+    mac: str
+    hostname: str | None
+    is_online: bool
+
+    @classmethod
+    def list_from_api(cls, raw: dict[str, Any]) -> list[MasterMacDevice]:
+        """Parse a strict client list without substituting the ``mac`` field."""
+        results = raw.get("results")
+        if not isinstance(results, list):
+            raise FortiOSResponseError("Invalid FortiOS device list")
+        devices = []
+        for entry in results:
+            if not isinstance(entry, dict):
+                raise FortiOSResponseError("Invalid FortiOS device")
+            mac = entry.get("master_mac")
+            if not isinstance(mac, str) or not mac:
+                continue
+            hostname = entry.get("hostname")
+            devices.append(
+                cls(
+                    mac=mac.upper(),
+                    hostname=hostname if isinstance(hostname, str) else None,
+                    is_online=bool(entry.get("is_online", False)),
+                )
+            )
+        return devices
 
 
 @dataclass(frozen=True, slots=True)
